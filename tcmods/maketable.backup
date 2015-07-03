@@ -1,0 +1,71 @@
+def writetable(table, team):
+    table.write("**" + team.name + "** Rank: " + str(team.rank) + '\n\n')
+    table.write('Date|Map|Score|Opponent|Rank Difference|W/L')
+    table.write('\n')
+    table.write(':-- | :-: | :-: | :-: | :-: | :-: \n')
+    for entry in team.recentGames:
+        rankDiff = team.rank - entry['oppRank']
+        table.write(entry['date'] + '|' + entry['map'] + '|'
+        + str(entry['teamScore']) + '-' + str(entry['oppScore']) + '|'
+        + entry['opponent'] + '|' + str(rankDiff) + '|')
+        if entry['teamScore'] > entry['oppScore']:
+            table.write('Win\n')
+        elif entry['teamScore'] < entry['oppScore']:
+            table.write('Lose\n')
+        else:
+            table.write('Tie\n')
+
+    table.write('\n\n\n')
+
+def maketable(Team1, Team2, Directory):
+    tableName = Team1.name + "-" + Team2.name + '.txt'
+    tableName = tableName.replace(" ", "")
+    table = open(Directory + tableName, 'w+')
+
+    table.write("**" + Team1.name + "** Rank: " + str(Team1.rank) + '\n\n')
+    table.write('Date|Map|Score|Opponent|Rank Difference|W/L')
+    table.write('\n')
+    table.write(':-- | :-: | :-: | :-: | :-: | :-: \n')
+    for entry in Team1.recentGames:
+        rankDiff = Team1.rank - entry['oppRank']
+        table.write(entry['date'] + '|' + entry['map'] + '|'
+        + str(entry['teamScore']) + '-' + str(entry['oppScore']) + '|'
+        + entry['opponent'] + '|' + str(rankDiff) + '|')
+        if entry['teamScore'] > entry['oppScore']:
+            table.write('Win\n')
+        elif entry['teamScore'] < entry['oppScore']:
+            table.write('Lose\n')
+        else:
+            table.write('Tie\n')
+
+    table.write('\n\n\n')
+
+    table.write("**" + Team2.name + "** Rank: " + str(Team2.rank) + '\n\n')
+    table.write('Date|Map|Score|Opponent|Rank Difference|W/L')
+    table.write('\n')
+    table.write(':-- | :-: | :-: | :-: | :-: | :-: \n')
+    for entry in Team2.recentGames:
+        rankDiff = Team1.rank - entry['oppRank']
+        table.write(entry['date'] + '|' + entry['map'] + '|'
+        + str(entry['teamScore']) + '-' + str(entry['oppScore']) + '|'
+        + entry['opponent'] + '|' + str(rankDiff) + '|')
+        if entry['teamScore'] > entry['oppScore']:
+            table.write('Win\n')
+        elif entry['teamScore'] < entry['oppScore']:
+            table.write('Lose\n')
+        else:
+            table.write('Tie\n')
+
+    table.write('\n\n')
+
+    table.write("Rank differences for recent matches reflect current "
+    "difference in rank between a team and its opponent. At the time " 
+    "of the match, the rank difference may not have been the given "
+    "value. A negative number indicates a disadvantage and a positive "
+    "number indicates an advantage. Ranks are those used by GosuGamers"
+    "\n\n")
+
+    table.write("http://steamcommunity.com/profiles/76561198011946609/")
+    
+    table.close()
+    return tableName
