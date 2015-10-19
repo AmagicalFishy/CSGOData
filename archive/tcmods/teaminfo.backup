@@ -1,0 +1,162 @@
+import mechanize
+import re
+from bs4 import BeautifulSoup, SoupStrainer
+from containers import Team
+
+#Attributes for HTML Parsing
+teamRankAttr = {'class':'tooltip'} #span
+teamNameAttr = {'class':'teamNameHolder'} #div
+gameWinnersAttr = {'class':'hidden result'} #span
+gameScoreAttr = {'class':'roundset totals'} #div
+homeScoreAttr = {'class':'home score'} #span
+awayScoreAttr = {'class':'away score'} #span
+mapNameAttr = {'class':'map-details-name'} #span
+
+#Input GOSU-Gamers team ID (the last clause on the team's profile page)
+def teaminfo(teamID):
+    teamURL = str('http://www.gosugamers.net/counterstrike/teams/'
+            + str(teamID))
+    teamNum = re.split('[\-]', teamID)[0]
+
+    ua = 'Mozilla/5.0 (X11; Linux x86_64; rv:18.0) Gecko/20100101 Firefox/18.0 (compatible;)' #For User-Agent header
+    browser = mechanize.Browser() #Opens browser object
+    browser.set_handle_robots(False) #I am not a robot
+    browser.addheaders = [('User-Agent',ua)] #Adds User-Agent headers
+    browser.open(teamURL) #Opens the team URL
+
+    soup = BeautifulSoup(browser.response().read()) #Read HTML
+
+    #Regex Strings
+    rexMatch = '^match-row-' + teamNum + '-' + '\d{1}' + '-l' #Match Regex
+
+    #Get the links to the recent matches and store them in a list
+    recentMatchContainers = soup.findAll('div', id=re.compile(rexMatch))
+    numMatches = len(recentMatchContainers)
+    matchLink = ['filler']*numMatches
+    for ii in range(numMatches):
+        matchLink[ii] = 'http://www.gosugamers.net' \
+                + recentMatchContainers[ii].findAll('a')[0].attrs['href']
+
+    #HTML Parsing
+    teamRank = int(soup('span', attrs=teamRankAttr)[0].text.replace(',',''))
+    teamName = str(soup('div', attrs=teamNameAttr)[0].text)
+    teamName = re.split('[\-]', teamName)[0].strip('\n\n ')
+
+    thisTeam = Team(teamName, teamRank)
+
+    ## Recent Match Statistics ##
+    #(1) Date of Match
+    #(2) Opponent Name
+    #(3) Opponent Rank
+    #(4) Map
+    #(5) This team's score
+    #(6) Opponent team's score
+
+    #Get statistics and fill class
+    for ii,link in enumerate(matchLink):
+        print("Processing Game: " + str(ii+1) + "/" + str(len(matchLink)))
+        browser.open(link) #Click on the recent-match link
+        soup = BeautifulSoup(browser.response().read()) #Read HTML
+
+        #Get Opponent Name
+        opponents = soup.findAll('div', attrs={'class':'match-opponents'})
+        for entry in opponents[0].findAll('a'):
+            if entry.text == teamName:
+                pass
+            else:
+                opponentName = str(entry.text)
+                break
+
+        #Get Date
+        try:
+            datetime = soup.findAll('p', attrs={'class':'datetime'})[0].text
+        except:
+            print("No date found")
+            datetime = ""
+
+        #Get Scores, Winner, and  Map Names for All Games
+        gameWinners = soup.findAll('span', attrs={'class':'hidden result'})
+
+        print(gameWinners[0].find('span').find('span'))
+
+        #Prunes gameWinners to contain only the winners
+        for ii,entry in enumerate(gameWinners):
+            if entry.find('a'):
+                gameWinners[ii] = entry.find('a').text
+            else:
+                gameWinners[ii] = 0
+
+        gameWinners = filter(lambda a: a != 0, gameWinners)
+        gameScores = soup.findAll('div', attrs=gameScoreAttr)
+
+        #len(gameScores) is also the number of games this match has (for
+        #example, it'd be 3 if it's a Bo3 match.
+        for jj in range(len(gameScores)):
+            thisTeam.add_game()
+            thisTeam.recentGames[-1]['date'] = datetime
+            thisTeam.recentGames[-1]['opponent'] = opponentName
+
+            matchInfo = soup.findAll('div',
+                    attrs={'id':'match-game-tab-'+ str(jj) +'-content'})
+
+            #Get Scores
+            try:
+                score1 = gameScores[jj].findAll('span',attrs=homeScoreAttr)
+                score2 = gameScores[jj].findAll('span',attrs=awayScoreAttr)
+                score1 = int(score1[0].text)
+                score2 = int(score2[0].text)
+
+            except:
+                score1 = None
+                score2 = None
+
+            winner = max(score1, score2)
+            loser = min(score1, score2)
+
+            #Set scores appropriately
+            if gameWinners[jj] == teamName:
+                thisTeam.recentGames[-1]['teamScore'] = winner
+                thisTeam.recentGames[-1]['oppScore'] = loser
+
+            else:
+                thisTeam.recentGames[-1]['teamScore'] = loser
+                thisTeam.recentGames[-1]['oppScore'] = winner
+
+            #Get Names of Maps
+            #GosuGamers Map-URL Correspondance
+            mapURL = {
+                'mirage':'/uploads/images/maps/102-1403702555.jpeg',
+                'cache':'/uploads/images/maps/105-1403702567.jpeg',
+                'nuke':'/uploads/images/maps/100-1403702528.jpeg',
+                'dust2':'/uploads/images/maps/99-1403702576.jpeg',
+                'season':'/uploads/images/maps/104-1403702572.jpeg',
+                'overpass':'/uploads/images/maps/127-1405440083.jpeg',
+                'inferno':'/uploads/images/maps/103-1403702580.jpeg',
+                'cobblestone':'/uploads/images/maps/128-1405440095.jpeg'
+            }
+            
+            #Match URL with map-name and fill appropriate data
+            found_map = 0
+            for key in mapURL:
+                if matchInfo[0].findAll('img',attrs={'src':mapURL[key]}):
+                    thisTeam.recentGames[-1]['map'] = key
+                    found_map = 1
+            if found_map == 0:
+                thisTeam.recentGames[-1]['map'] = "unknown"
+
+            
+            #Get Opponent's Current Rank
+            #Follow link to opponents name, parse HTML, add rank, go back
+            browser.follow_link(text=thisTeam.recentGames[-1]['opponent'],nr=0)
+            soup = BeautifulSoup(browser.response().read()) #Read HTML
+            oppRank = int(soup('span', attrs=teamRankAttr)[0].text.replace(',',''))
+            thisTeam.recentGames[-1]['oppRank'] = oppRank
+            browser.back()
+            soup = BeautifulSoup(browser.response().read())
+
+    return thisTeam
+
+#For Debugging Purposes
+if __name__ == "__main__":
+    teamID = raw_input("GosuGamers TeamID?\n")
+    Team = teaminfo(teamID)
